@@ -2,7 +2,12 @@ pipeline {
     agent any
 
     stages {
-        stage('Hello') {
+        stage('build') {
+            steps {
+                 sh 'mvn clean'
+            }
+        }
+         stage('deploy') {
             steps {
                 echo 'Hello'
             }
