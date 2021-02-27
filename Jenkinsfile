@@ -1,89 +1,60 @@
-def version = "${env.BUILD_NUMBER}"
-
-node('docker') {
-    stage('Checkout') {
-        scm checkout
+pipeline{
+    agent any
+    options {
+      timeout(30)
     }
+    stages{
 
-    //это стадия сборки
-    stage 'Build'
-    sh "./gradlew -Pversion=${version} build"
+        stage('Maven and Sonar'){
 
-    stage('Sonar') {
-    // withSonarQubeEnv('sonar') {
-    //   sh "./gradlew -Pversion=${version} --info sonarqube"
-    // }
-    //
-    // sleep 5
-    //
-    // def sonarStatus = waitForQualityGate().status
-    // if (sonarStatus != 'OK') {
-    //   if (sonarStatus == 'WARN') {
-    //     currentBuild.result = 'UNSTABLE'
-    //   } else {
-    //     error "Quality gate is broken"
-    //   }
-    // }
-    }
+            parallel{
+            stage('Sonar Analysis'){
+                steps{
+                    withSonarQubeEnv('sonar7') {
+                        sh 'mvn sonar:sonar'
+                    }
 
-    stage 'Publish JAR'
-    uploadJarToNexus(version)
+                    timeout(time: 1, unit: 'HOURS') {
+                        script{
+                          def qg = waitForQualityGate()
+                          if (qg.status != 'OK') {
+                              error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                          }
+                        }
+                  }
+                }
+            }
 
-    stage 'Publish Docker'
-    sh "curl -o app.jar http://nexus:8081/repository/maven-releases/com/example/demo/${version}/demo-${version}.jar"
-    docker.withServer('tcp://socatdockersock:2375') {
-        docker.withRegistry('http://nexus:20000', 'god') {
-            docker.build("demo").push("${version}")
+             stage('Mvn Build'){
+                steps{
+                    sh 'mvn clean package'
+                }
+            }
+
+
         }
-    }
-}
 
-node('docker') {
-  def containerName = "demo${version}"
-
-  stage('Deploy') {
-    docker.withServer('tcp://socatdockersock:2375') {
-      sh """docker run -d --name ${containerName} --net jenkinspipelineworkshop_default \
-      -p 10080 nexus:20000/demo:${version}"""
-    }
-  }
-
-  try {
-    postDeployCheck(containerName)
-  } finally {
-    stage('Finalize') {
-      docker.withServer('tcp://socatdockersock:2375') {
-        sh "docker rm -f ${containerName}"
-        sh "docker rmi -f nexus:20000/demo:${version}"
-      }
-    }
-  }
-}
-
-def postDeployCheck(containerName) {
-  stage('Post-Deploy') {
-    timeout(20) {
-      waitUntil {
-        try {
-          sh "curl ${containerName}:10080/health"
-          return true
-        } catch(error) {
-          sleep 1
-          currentBuild.result = 'SUCCESS'
-          return false
         }
-      }
+        stage("Nexus Deploy"){
+            steps{
+                script{
+                    def pomFile = readMavenPom file: 'pom.xml'
+                    nexusArtifactUploader artifacts: [[artifactId: 'myweb', classifier: '', file: "target/myweb-${pomFile.version}.war", type: 'war']],
+                                      credentialsId: 'nexus3',
+                                      groupId: 'in.javahome',
+                                      nexusUrl: '172.31.71.247:8081',
+                                      nexusVersion: 'nexus3',
+                                      protocol: 'http', repository: 'javahome-my-app',
+                                      version: pomFile.version
+                }
+            }
+        }
+
+        stage('Tomcat Deploy'){
+            steps{
+                tomcatDeploy("172.31.35.55","ec2-user","myweb")
+            }
+        }
+
     }
-  }
 }
-
-def uploadJarToNexus(version) {
-  nexusArtifactUploader artifacts: [
-    [artifactId: 'demo',
-    file: "build/libs/demo-${version}.jar",
-    type: 'jar']
-  ], credentialsId: 'god', groupId: 'com.example', nexusUrl: 'nexus:8081',
-  nexusVersion: 'nexus3', protocol: 'http', repository: 'maven-releases',
-  version: "${version}"
-}
-
