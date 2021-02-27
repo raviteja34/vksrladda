@@ -6,14 +6,16 @@ logging:
         web: DEBUG
 spring:
   datasource:
-    driver-class-name: com.mysql.jdbc.Driver
-    password: admin@123
-    url: jdbc:mysql://localhost/springbootdb?allowPublicKeyRetrieval=true&useSSL=false
-    username: root
+    url: jdbc:mysql://aa1tmu4k8hmyfpl.cqqcaenuxmfu.ap-south-1.rds.amazonaws.com:3306/ravidb?allowPublicKeyRetrieval=true&useSSL=false
+    username: ravidb
+    password: raviroot
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5Dialect
     show-sql: true
+
+server:
+  port: 5000

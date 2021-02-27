@@ -18,8 +18,7 @@ public class Employee {
     private int id;
     private String name;
     private String email;
-    private int phone;
-    private String department;
+    private  String phone;
 
     public int getId() {
         return id;
@@ -45,19 +44,11 @@ public class Employee {
         this.email = email;
     }
 
-    public int getPhone() {
+    public String getPhone() {
         return phone;
     }
 
-    public void setPhone(int phone) {
+    public void setPhone(String phone) {
         this.phone = phone;
-    }
-
-    public String getDepartment() {
-        return department;
-    }
-
-    public void setDepartment(String department) {
-        this.department = department;
     }
 }
