@@ -2,4 +2,4 @@
 
 it is purly java spring boot project
 
-defecults facing
+number of issues
